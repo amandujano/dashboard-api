@@ -9,9 +9,9 @@ let appReady: Promise<void> | null = null;
 async function bootstrapServer() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
-  app.enableCors({
-    origin: ['http://localhost:5173', 'https://www.anmandu.com'],
-  });
+  // app.enableCors({
+  //   origin: ['http://localhost:5173', 'https://www.anmandu.com'],
+  // });
 
   await app.init();
 }
