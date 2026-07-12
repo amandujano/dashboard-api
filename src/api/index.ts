@@ -2,17 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 import { AppModule } from '../app.module';
+import cookieParser from 'cookie-parser';
 
 const server = express();
 let appReady: Promise<void> | null = null;
 
 async function bootstrapServer() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
-
-  // app.enableCors({
-  //   origin: ['http://localhost:5173', 'https://www.anmandu.com'],
-  // });
-
+  app.use(cookieParser());
   await app.init();
 }
 
