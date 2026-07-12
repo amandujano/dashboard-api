@@ -4,18 +4,30 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class SupabaseService {
-  private client: SupabaseClient;
+  private adminClient: SupabaseClient;
+  private authClient: SupabaseClient;
 
   constructor(private configService: ConfigService) {
     const url: string = this.configService.get<string>('SUPABASE_URL')!;
-    const role_key: string = this.configService.get<string>(
-      'SUPABASE_SERVICE_ROLE_KEY',
-    )!;
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    this.client = createClient(url, role_key);
+    this.adminClient = createClient(
+      url,
+      this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    this.authClient = createClient(
+      url,
+      this.configService.get<string>('SUPABASE_ANON_KEY')!,
+    );
   }
 
   getClient(): SupabaseClient {
-    return this.client;
+    return this.adminClient;
+  }
+
+  getAuthClient(): SupabaseClient {
+    return this.authClient;
   }
 }
