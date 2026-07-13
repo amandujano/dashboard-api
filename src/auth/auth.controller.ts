@@ -2,11 +2,7 @@ import { Body, Controller, Get, Header, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
-
-interface LoginBody {
-  email: string;
-  password: string;
-}
+import { LoginDto } from './dto/login.dto';
 
 @Controller('api/auth')
 export class AuthController {
@@ -16,7 +12,7 @@ export class AuthController {
   @Post('login')
   @Header('Cache-Control', 'no-store')
   async login(
-    @Body() body: LoginBody,
+    @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const session = await this.authService.login(body.email, body.password);
