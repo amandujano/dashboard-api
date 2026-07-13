@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
@@ -14,6 +14,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Header('Cache-Control', 'no-store')
   async login(
     @Body() body: LoginBody,
     @Res({ passthrough: true }) res: Response,
@@ -40,6 +41,7 @@ export class AuthController {
 
   @Public()
   @Post('logout')
+  @Header('Cache-Control', 'no-store')
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('sb-access-token', { path: '/' });
     res.clearCookie('sb-refresh-token', { path: '/' });
@@ -47,6 +49,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @Header('Cache-Control', 'no-store')
   me(@Req() req: Request) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     return { user: req['user'] };
