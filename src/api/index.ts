@@ -4,6 +4,7 @@ import express from 'express';
 import { AppModule } from '../app.module';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 const server = express();
 let appReady: Promise<void> | null = null;
@@ -11,6 +12,9 @@ let appReady: Promise<void> | null = null;
 async function bootstrapServer() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
   app.use(cookieParser());
+
+  // dentro de bootstrapServer(), antes de crear el documento de Swagger:
+  app.useGlobalPipes(new ZodValidationPipe());
 
   const config = new DocumentBuilder()
     .setTitle('Dashboard API')
