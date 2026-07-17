@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 import { LoginDto } from './dto/login.dto';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('api/auth')
 export class AuthController {
@@ -11,6 +12,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @Header('Cache-Control', 'no-store')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,

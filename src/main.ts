@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
@@ -10,6 +12,7 @@ async function bootstrap() {
 
   // dentro de bootstrap() / bootstrapServer(), antes de crear el documento de Swagger:
   app.useGlobalPipes(new ZodValidationPipe());
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   const config = new DocumentBuilder()
     .setTitle('Dashboard API')
