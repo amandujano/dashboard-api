@@ -9,6 +9,9 @@ import { AuthModule } from './auth/auth.module';
 import { AuthGuard } from './auth/auth.guard';
 import { ContactMessageModule } from './contact-message/contact-message.module';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { BlogPostsService } from './blog-posts/blog-posts.service';
+import { BlogPostsController } from './blog-posts/blog-posts.controller';
+import { BlogPostsModule } from './blog-posts/blog-posts.module';
 
 @Module({
   imports: [
@@ -28,8 +31,14 @@ import { ThrottlerModule } from '@nestjs/throttler';
     ProfileModule,
     AuthModule,
     ContactMessageModule,
+    BlogPostsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],
+  controllers: [AppController, BlogPostsController],
+  // eslint-disable-next-line prettier/prettier
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: AuthGuard },
+    BlogPostsService,
+  ],
 })
 export class AppModule {}
