@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
@@ -12,6 +13,12 @@ let appReady: Promise<void> | null = null;
 async function bootstrapServer() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
   app.use(cookieParser());
+
+  // forward proxy settings to the underlying Express instance
+  (app.getHttpAdapter().getInstance() as express.Application).set(
+    'trust proxy',
+    1,
+  );
 
   // dentro de bootstrapServer(), antes de crear el documento de Swagger:
   app.useGlobalPipes(new ZodValidationPipe());
