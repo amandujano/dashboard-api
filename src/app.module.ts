@@ -12,6 +12,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { BlogPostsService } from './blog-posts/blog-posts.service';
 import { BlogPostsController } from './blog-posts/blog-posts.controller';
 import { BlogPostsModule } from './blog-posts/blog-posts.module';
+import { TelemetryModule } from './telemetry/telemetry.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { BlogPostsModule } from './blog-posts/blog-posts.module';
     AuthModule,
     ContactMessageModule,
     BlogPostsModule,
+    TelemetryModule,
   ],
   controllers: [AppController, BlogPostsController],
   // eslint-disable-next-line prettier/prettier
