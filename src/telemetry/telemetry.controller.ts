@@ -28,4 +28,9 @@ export class TelemetryController {
   async stats() {
     return this.telemetryService.getStats();
   }
+
+  @Get('visitors')
+  async visitors() {
+    return this.telemetryService.getVisitors();
+  }
 }
