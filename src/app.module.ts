@@ -13,6 +13,7 @@ import { BlogPostsService } from './blog-posts/blog-posts.service';
 import { BlogPostsController } from './blog-posts/blog-posts.controller';
 import { BlogPostsModule } from './blog-posts/blog-posts.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
+import { ImagesModule } from './images/images.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TelemetryModule } from './telemetry/telemetry.module';
     ContactMessageModule,
     BlogPostsModule,
     TelemetryModule,
+    ImagesModule,
   ],
   controllers: [AppController, BlogPostsController],
   // eslint-disable-next-line prettier/prettier
