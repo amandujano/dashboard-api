@@ -81,18 +81,52 @@ export class ImagesService {
     return ImageEntitySchema.parse(data);
   }
 
-  async findAll() {
-    const { data, error } = await this.supabaseService
-      .getClient()
+  async findAll(collectionSlug?: string) {
+    const client = this.supabaseService.getClient();
+
+    // Si hay filtro, primero resolvemos el slug → id de la colección
+    let collectionId: string | undefined;
+    if (collectionSlug) {
+      const { data: collection } = await client
+        .from('collections')
+        .select('id')
+        .eq('slug', collectionSlug)
+        .single();
+
+      if (!collection) {
+        return []; // colección inexistente → sin resultados
+      }
+      collectionId = collection.id;
+    }
+
+    const embed = collectionId
+      ? 'image_collections!inner(collection_id)'
+      : 'image_collections(collection_id)';
+
+    let query = client
       .from('images')
-      .select('*')
+      .select(`*, ${embed}`)
       .order('created_at', { ascending: false });
+
+    if (collectionId) {
+      query = query.eq('image_collections.collection_id', collectionId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
-    return data.map((row) => ImageEntitySchema.parse(row));
+    return data.map((row) => {
+      const { image_collections, ...image } = row;
+      return {
+        ...ImageEntitySchema.parse(image),
+        collectionIds: (image_collections ?? []).map(
+          (rel: { collection_id: string }) => rel.collection_id,
+        ),
+      };
+    });
   }
 
   async remove(id: string) {
@@ -110,6 +144,38 @@ export class ImagesService {
     await del([data.url_thumb, data.url_medium, data.url_full]);
 
     await this.supabaseService.getClient().from('images').delete().eq('id', id);
+
+    return { ok: true };
+  }
+
+  async addToCollection(imageId: string, collectionId: string) {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('image_collections')
+      .insert([{ image_id: imageId, collection_id: collectionId }]);
+
+    if (error) {
+      // 23505 = unique_violation: la imagen ya estaba en esa colección
+      if (error.code === '23505') {
+        return { ok: true }; // idempotente: ya está, no es un error real
+      }
+      throw new BadRequestException(error.message);
+    }
+
+    return { ok: true };
+  }
+
+  async removeFromCollection(imageId: string, collectionId: string) {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('image_collections')
+      .delete()
+      .eq('image_id', imageId)
+      .eq('collection_id', collectionId);
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
 
     return { ok: true };
   }
