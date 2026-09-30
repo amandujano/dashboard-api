@@ -5,6 +5,7 @@ import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { desc } from 'drizzle-orm';
+import geoip from 'geoip-lite';
 import { DRIZZLE } from '../database/database.constants';
 import { orFail } from '../database/db-error';
 import type { Database } from '../database/database.types';
@@ -21,7 +22,6 @@ const visitCols = {
 type VisitInput = {
   ip: string;
   path: string;
-  country?: string;
   userAgent?: string;
 };
 
@@ -48,12 +48,21 @@ export class TelemetryService {
     return 'other';
   }
 
+  // Offline IP -> country lookup (no external call, no third-party IP
+  // sharing). geoip.lookup returns null for unresolvable/private/malformed
+  // IPs (e.g. 'unknown', loopback, LAN addresses) — treat that as "no
+  // country" rather than throwing.
+  private lookupCountry(ip: string): string | undefined {
+    const result = geoip.lookup(ip);
+    return result?.country ?? undefined;
+  }
+
   async recordVisit(input: VisitInput) {
     await orFail(
       this.db.insert(page_views).values({
         visitor_hash: this.hashIp(input.ip),
         path: input.path,
-        country: input.country ?? null,
+        country: this.lookupCountry(input.ip) ?? null,
         browser: this.parseBrowser(input.userAgent),
       }),
       (message) => new BadRequestException(message),

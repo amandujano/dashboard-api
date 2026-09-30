@@ -10,16 +10,14 @@ export class TelemetryController {
   @Public()
   @Post()
   async record(@Req() req: Request, @Body() body: { path?: string }) {
-    const forwarded = req.headers['x-forwarded-for'];
-    const ip =
-      (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-        ?.split(',')[0]
-        ?.trim() ?? 'unknown';
+    // req.ip is Express's trust-proxy-aware resolved client IP — it walks the
+    // forwarded chain from the trusted side, unlike a raw x-forwarded-for
+    // header (which a client's own request can spoof).
+    const ip = req.ip ?? 'unknown';
 
     return this.telemetryService.recordVisit({
       ip,
       path: body.path ?? '/',
-      country: req.headers['x-vercel-ip-country'] as string | undefined,
       userAgent: req.headers['user-agent'],
     });
   }
