@@ -1,21 +1,22 @@
-import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { DRIZZLE } from '../database/database.constants';
+import type { Database } from '../database/database.types';
+import { profile } from '../database/schema';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
   async getProfile() {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('profile')
-      .select('name, bio')
-      .single();
+    const [row] = await this.db
+      .select({ name: profile.name, bio: profile.bio })
+      .from(profile)
+      .limit(1);
 
-    if (error) {
-      throw error;
+    if (!row) {
+      throw new NotFoundException('Profile not found');
     }
 
-    return data;
+    return row;
   }
 }

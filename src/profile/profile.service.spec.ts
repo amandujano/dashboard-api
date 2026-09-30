@@ -1,18 +1,30 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { DRIZZLE } from '../database/database.constants';
+import { createMockDb } from '../database/mock-db.testing';
 import { ProfileService } from './profile.service';
 
+async function build(...results: unknown[]) {
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [
+      ProfileService,
+      { provide: DRIZZLE, useValue: createMockDb(...results) },
+    ],
+  }).compile();
+  return module.get(ProfileService);
+}
+
 describe('ProfileService', () => {
-  let service: ProfileService;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [ProfileService],
-    }).compile();
-
-    service = module.get<ProfileService>(ProfileService);
+  it('returns name and bio', async () => {
+    const service = await build([{ name: 'Angel', bio: 'Dev' }]);
+    await expect(service.getProfile()).resolves.toEqual({
+      name: 'Angel',
+      bio: 'Dev',
+    });
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('throws NotFoundException when there is no profile row', async () => {
+    const service = await build([]);
+    await expect(service.getProfile()).rejects.toThrow(NotFoundException);
   });
 });

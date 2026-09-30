@@ -1,104 +1,106 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { desc, eq } from 'drizzle-orm';
+import { DRIZZLE } from '../database/database.constants';
+import { orFail } from '../database/db-error';
+import type { Database } from '../database/database.types';
+import { blog_posts } from '../database/schema';
 import {
   BlogPostEntitySchema,
   BlogPostSummarySchema,
 } from './entity/blog-post';
 import { CreateBlogPostDto, UpdateBlogPostDto } from './dto/create-blog-post';
 
+const summaryColumns = {
+  id: blog_posts.id,
+  slug: blog_posts.slug,
+  title: blog_posts.title,
+  author: blog_posts.author,
+  is_published: blog_posts.is_published,
+  published_at: blog_posts.published_at,
+};
+
 @Injectable()
 export class BlogPostsService {
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
   async getAllPosts() {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('blog_posts')
-      .select('id, slug, title, author, is_published, published_at')
-      .order('published_at', { ascending: false });
+    const rows = await orFail(
+      this.db
+        .select(summaryColumns)
+        .from(blog_posts)
+        .orderBy(desc(blog_posts.published_at)),
+      (message) => new NotFoundException(message),
+    );
 
-    if (error) {
-      throw new NotFoundException(error.message);
-    }
-
-    return data.map((post) => BlogPostSummarySchema.parse(post));
+    return rows.map((post) => BlogPostSummarySchema.parse(post));
   }
 
   async getPostBySlug(slug: string) {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('blog_posts')
-      .select('*')
-      .eq('slug', slug)
-      .single();
+    const [post] = await orFail(
+      this.db
+        .select()
+        .from(blog_posts)
+        .where(eq(blog_posts.slug, slug))
+        .limit(1),
+      () => new NotFoundException('Post not found'),
+    );
 
-    if (error || !data) {
+    if (!post) {
       throw new NotFoundException('Post not found');
     }
 
-    return BlogPostEntitySchema.parse(data);
+    return BlogPostEntitySchema.parse(post);
   }
 
   async getAllPostsAdmin() {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('blog_posts')
-      .select('id, slug, title, author, is_published, published_at')
-      .order('published_at', { ascending: false });
-
-    if (error) {
-      throw new NotFoundException(error.message);
-    }
-
-    return data.map((post) => BlogPostSummarySchema.parse(post));
+    return this.getAllPosts();
   }
 
   async createPost(input: CreateBlogPostDto) {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('blog_posts')
-      .insert([input])
-      .select()
-      .single();
+    const [post] = await orFail(
+      this.db.insert(blog_posts).values(input).returning(),
+      (message) => new BadRequestException(message),
+    );
 
-    if (error || !data) {
-      throw new BadRequestException(error?.message ?? 'Error creating post');
+    if (!post) {
+      throw new BadRequestException('Error creating post');
     }
 
-    return BlogPostEntitySchema.parse(data);
+    return BlogPostEntitySchema.parse(post);
   }
 
   async updatePost(slug: string, input: UpdateBlogPostDto) {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('blog_posts')
-      .update(input)
-      .eq('slug', slug)
-      .select()
-      .single();
-
-    if (error || !data) {
-      throw new NotFoundException(error?.message ?? 'Post not found');
+    // Drizzle rejects an empty SET clause, so fall back to a plain read.
+    if (Object.values(input).every((value) => value === undefined)) {
+      return this.getPostBySlug(slug);
     }
 
-    return BlogPostEntitySchema.parse(data);
+    const [post] = await orFail(
+      this.db
+        .update(blog_posts)
+        .set(input)
+        .where(eq(blog_posts.slug, slug))
+        .returning(),
+      (message) => new NotFoundException(message),
+    );
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    return BlogPostEntitySchema.parse(post);
   }
 
   async deletePost(slug: string) {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('blog_posts')
-      .delete()
-      .eq('slug', slug);
-
-    if (error) {
-      throw new NotFoundException(error.message);
-    }
+    await orFail(
+      this.db.delete(blog_posts).where(eq(blog_posts.slug, slug)),
+      (message) => new NotFoundException(message),
+    );
 
     return { ok: true };
   }

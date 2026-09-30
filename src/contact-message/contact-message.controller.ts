@@ -12,7 +12,6 @@ export class ContactMessageController {
   async create(@Body() dto: CreateContactMessageDto) {
     const { name, email, message } = dto;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.contactMessageService.saveContactMessage(name, email, message);
   }
 }
