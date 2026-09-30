@@ -11,8 +11,8 @@ describe('TelemetryController', () => {
     getVisitors: jest.fn(),
   };
 
-  const req = (headers: Record<string, string | string[]>) =>
-    ({ headers }) as unknown as Request;
+  const req = (ip: string | undefined, headers: Record<string, string> = {}) =>
+    ({ ip, headers }) as unknown as Request;
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -25,34 +25,28 @@ describe('TelemetryController', () => {
     controller = module.get<TelemetryController>(TelemetryController);
   });
 
-  it('record uses the first forwarded IP and request metadata', async () => {
+  it('record uses the trust-proxy-resolved IP and request metadata', async () => {
     service.recordVisit.mockResolvedValue({ ok: true });
 
     const result = await controller.record(
-      req({
-        'x-forwarded-for': '1.1.1.1, 2.2.2.2',
-        'x-vercel-ip-country': 'MX',
-        'user-agent': 'jest',
-      }),
+      req('1.1.1.1', { 'user-agent': 'jest' }),
       { path: '/blog' },
     );
 
     expect(service.recordVisit).toHaveBeenCalledWith({
       ip: '1.1.1.1',
       path: '/blog',
-      country: 'MX',
       userAgent: 'jest',
     });
     expect(result).toEqual({ ok: true });
   });
 
   it('record falls back to unknown IP and root path', async () => {
-    await controller.record(req({}), {});
+    await controller.record(req(undefined), {});
 
     expect(service.recordVisit).toHaveBeenCalledWith({
       ip: 'unknown',
       path: '/',
-      country: undefined,
       userAgent: undefined,
     });
   });

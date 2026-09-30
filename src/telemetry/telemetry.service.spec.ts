@@ -1,9 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import geoip from 'geoip-lite';
 import { DRIZZLE } from '../database/database.constants';
 import { createMockDb, driverError } from '../database/mock-db.testing';
 import { TelemetryService } from './telemetry.service';
+
+jest.mock('geoip-lite', () => ({
+  lookup: jest.fn(),
+}));
+
+const mockedGeoipLookup = geoip.lookup as jest.Mock;
 
 async function build(...results: unknown[]) {
   const module: TestingModule = await Test.createTestingModule({
@@ -14,6 +21,22 @@ async function build(...results: unknown[]) {
     ],
   }).compile();
   return module.get(TelemetryService);
+}
+
+/** Like `build`, but captures the row passed to `db.insert(...).values(...)`. */
+async function buildWithInsertSpy() {
+  const values = jest.fn().mockResolvedValue(undefined);
+  const db = { insert: jest.fn(() => ({ values })) };
+
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [
+      TelemetryService,
+      { provide: DRIZZLE, useValue: db },
+      { provide: ConfigService, useValue: { get: () => 'salt' } },
+    ],
+  }).compile();
+
+  return { service: module.get<TelemetryService>(TelemetryService), values };
 }
 
 const rows = [
@@ -38,11 +61,39 @@ const rows = [
 ];
 
 describe('TelemetryService', () => {
+  beforeEach(() => {
+    mockedGeoipLookup.mockReset();
+  });
+
   it('records a visit', async () => {
     const service = await build(undefined);
     await expect(
       service.recordVisit({ ip: '1.1.1.1', path: '/' }),
     ).resolves.toEqual({ ok: true });
+  });
+
+  it('derives the country from the geoip lookup of the given IP', async () => {
+    mockedGeoipLookup.mockReturnValue({ country: 'MX' });
+    const { service, values } = await buildWithInsertSpy();
+
+    await service.recordVisit({ ip: '1.2.3.4', path: '/' });
+
+    expect(mockedGeoipLookup).toHaveBeenCalledWith('1.2.3.4');
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'MX' }),
+    );
+  });
+
+  it('persists no country when the IP cannot be resolved', async () => {
+    mockedGeoipLookup.mockReturnValue(null);
+    const { service, values } = await buildWithInsertSpy();
+
+    await expect(
+      service.recordVisit({ ip: 'unknown', path: '/' }),
+    ).resolves.toEqual({ ok: true });
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ country: null }),
+    );
   });
 
   it('maps an insert failure to BadRequestException', async () => {
