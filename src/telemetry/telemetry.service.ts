@@ -1,11 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-import { Injectable, BadRequestException } from '@nestjs/common';
+
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
-import { SupabaseService } from '../supabase/supabase.service';
+import { desc } from 'drizzle-orm';
+import { DRIZZLE } from '../database/database.constants';
+import { orFail } from '../database/db-error';
+import type { Database } from '../database/database.types';
+import { page_views } from '../database/schema';
 import { aliasFromHash, emojiFromHash } from './visitor-alias';
+
+const visitCols = {
+  visitor_hash: page_views.visitor_hash,
+  country: page_views.country,
+  browser: page_views.browser,
+  created_at: page_views.created_at,
+};
 
 type VisitInput = {
   ip: string;
@@ -17,7 +28,7 @@ type VisitInput = {
 @Injectable()
 export class TelemetryService {
   constructor(
-    private supabaseService: SupabaseService,
+    @Inject(DRIZZLE) private readonly db: Database,
     private configService: ConfigService,
   ) {}
 
@@ -38,34 +49,24 @@ export class TelemetryService {
   }
 
   async recordVisit(input: VisitInput) {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('page_views')
-      .insert([
-        {
-          visitor_hash: this.hashIp(input.ip),
-          path: input.path,
-          country: input.country ?? null,
-          browser: this.parseBrowser(input.userAgent),
-        },
-      ]);
-
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
+    await orFail(
+      this.db.insert(page_views).values({
+        visitor_hash: this.hashIp(input.ip),
+        path: input.path,
+        country: input.country ?? null,
+        browser: this.parseBrowser(input.userAgent),
+      }),
+      (message) => new BadRequestException(message),
+    );
 
     return { ok: true };
   }
 
   async getStats() {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('page_views')
-      .select('visitor_hash, country, browser, created_at');
-
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
+    const data = await orFail(
+      this.db.select(visitCols).from(page_views),
+      (message) => new BadRequestException(message),
+    );
 
     const totalVisits = data.length;
     const uniqueVisitors = new Set(data.map((v) => v.visitor_hash)).size;
@@ -98,15 +99,13 @@ export class TelemetryService {
   }
 
   async getVisitors() {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('page_views')
-      .select('visitor_hash, country, browser, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
+    const data = await orFail(
+      this.db
+        .select(visitCols)
+        .from(page_views)
+        .orderBy(desc(page_views.created_at)),
+      (message) => new BadRequestException(message),
+    );
 
     const visitors = new Map<
       string,
@@ -123,8 +122,8 @@ export class TelemetryService {
     >();
 
     for (const row of data) {
-      const hash = row.visitor_hash as string;
-      const seenAt = row.created_at as string;
+      const hash = row.visitor_hash ?? 'unknown';
+      const seenAt = row.created_at;
       const existing = visitors.get(hash);
 
       if (existing) {
