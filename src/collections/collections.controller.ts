@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CollectionsService } from './collections.service';
-import { Public } from 'src/auth/public.decorator';
+import { Public } from '../auth/public.decorator';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 
 @Controller('api/collections')

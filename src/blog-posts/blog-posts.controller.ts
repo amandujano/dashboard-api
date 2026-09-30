@@ -7,7 +7,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { Public } from 'src/auth/public.decorator';
+import { Public } from '../auth/public.decorator';
 import { BlogPostsService } from './blog-posts.service';
 import { CreateBlogPostDto, UpdateBlogPostDto } from './dto/create-blog-post';
 
